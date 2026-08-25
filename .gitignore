@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.vscode/
+
+# Large generated simulation outputs
+outputs/event_log_all_scenarios.csv
+outputs/children_all_scenarios.csv
+outputs/ml_dataset_outcome.csv
