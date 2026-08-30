@@ -1,5 +1,6 @@
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
 import ml_config as config
 
 def get_models():
@@ -15,9 +16,10 @@ def get_models():
             random_state=42, 
             class_weight="balanced"
         ),
-        "Gradient Boosting": GradientBoostingClassifier(
+        "XGBoost": XGBClassifier(
             n_estimators=100, 
-            random_state=42
+            random_state=42,
+            eval_metric="mlogloss"
         )
     }
     return models
