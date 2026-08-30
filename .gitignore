@@ -8,3 +8,7 @@ __pycache__/
 outputs/event_log_all_scenarios.csv
 outputs/children_all_scenarios.csv
 outputs/ml_dataset_outcome.csv
+
+
+# Large csv file
+ml_model/children_all_scenarios.csv
