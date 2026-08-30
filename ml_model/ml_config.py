@@ -7,17 +7,17 @@ DATA_PATH = os.path.join(BASE_DIR, "children_all_scenarios.csv")
 # --- TARGET CONFIGURATION ---
 TARGET_COL = "final_outcome"
 TARGET_MAP = {
-    "RECOV": 0,
-    "DROPO": 1,
-    "NON_R": 2
+    "RECOVERED": 0,
+    "DROPOUT": 1,
+    "NON_RESPONDER": 2
 }
 
-# --- GROUPING CONFIGURATION (For Group K-Fold / Seed Splitting) ---
-GROUP_COL = "replication_id"
+# --- GROUPING CONFIGURATION ---
+GROUP_COL = "replication"
 
-# --- ENTRY-LEVEL FEATURES (Strictly Baseline/Early Information Only) ---
+# --- ENTRY-LEVEL BASELINE FEATURES ---
 CATEGORICAL_FEATURES = [
-    "initial_health_status",
+    "initial_health_state",
     "initial_medical_complication",
     "scenario"
 ]
@@ -25,7 +25,7 @@ CATEGORICAL_FEATURES = [
 NUMERICAL_FEATURES = [
     "entry_day",
     "nrc_capacity",
-    "family_readiness_parameter",
+    "family_referral_compliance_parameter",
     "followup_attendance_parameter"
 ]
 
