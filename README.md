@@ -54,6 +54,19 @@ python run_simulation.py
 
 Generated files will appear in `outputs/`.
 
+The default command preserves the 1,000-child run as the
+"Low-demand / original baseline", searches the predefined demand-load range
+with 30 replications per load, selects the lowest load with mean NRC
+utilisation in the 70–90% band, and compares 5, 10, 12 and 20 beds with 100
+common-seed replications. Use `--search-replications 50` or
+`--search-replications 100` when runtime permits. The optional
+`--include-existing-analyses` flag also regenerates the verified scenario,
+sensitivity and ML CSV workflow.
+
+This calibration matches simulated facility workload to a literature-informed
+occupancy range; it does not imply that the selected number of detected
+children is a national epidemiological estimate.
+
 ## Main files
 
 - `config.py`: all model inputs

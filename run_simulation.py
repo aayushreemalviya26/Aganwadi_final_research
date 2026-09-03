@@ -1,9 +1,19 @@
-from pathlib import Path
+import argparse
 import json
+from pathlib import Path
 
 import pandas as pd
 
 from config import BASELINE_CONFIG
+
+from calibration import (
+    CALIBRATION_BAND,
+    run_calibrated_capacity_analysis,
+    run_load_calibration,
+    select_calibrated_load,
+    summarise_calibrated_capacity,
+    summarise_load_calibration,
+)
 
 from scenarios import (
     run_single,
@@ -17,11 +27,12 @@ from sensitivity import (
 )
 
 from visualization import (
+    plot_calibrated_capacity_effect,
+    plot_calibrated_capacity_utilisation,
+    plot_load_vs_nrc_utilisation,
+    plot_load_vs_queue_wait,
     plot_nrc_occupancy,
     plot_outcomes,
-    plot_scenario_delays,
-    plot_scenario_outcomes,
-    plot_nrc_scenario_performance,
 )
 
 
@@ -131,7 +142,76 @@ def build_referral_ml_dataset(
 # MAIN
 # =========================================================
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run workload calibration and calibrated NRC capacity analysis."
+    )
+    parser.add_argument(
+        "--search-replications",
+        type=int,
+        default=30,
+        help="Replications per candidate load (default: 30).",
+    )
+    parser.add_argument(
+        "--final-replications",
+        type=int,
+        default=100,
+        help="Replications per calibrated capacity (default: 100).",
+    )
+    parser.add_argument(
+        "--include-existing-analyses",
+        action="store_true",
+        help=(
+            "Also regenerate the existing scenario, sensitivity, and ML CSVs; "
+            "their legacy plots are intentionally not regenerated."
+        ),
+    )
+    return parser.parse_args()
+
+
+def run_existing_analyses(output_dir: Path) -> None:
+    """Retain the verified scenario, sensitivity, and ML export workflow."""
+    print("\nRunning existing scenario analysis and ML exports...")
+    scenario_results, all_children, all_events = run_scenarios(
+        BASELINE_CONFIG,
+        replications=100,
+    )
+    scenario_results.to_csv(
+        output_dir / "scenario_replications.csv", index=False
+    )
+    all_children.to_csv(
+        output_dir / "children_all_scenarios.csv", index=False
+    )
+    all_events.to_csv(
+        output_dir / "event_log_all_scenarios.csv", index=False
+    )
+    summarise_scenarios(scenario_results).to_csv(
+        output_dir / "scenario_summary.csv", index=False
+    )
+
+    print("\nRunning existing one-way sensitivity analysis...")
+    sensitivity_results = run_sensitivity_analysis(
+        BASELINE_CONFIG,
+        replications=100,
+    )
+    sensitivity_results.to_csv(
+        output_dir / "sensitivity_replications.csv", index=False
+    )
+    summarise_sensitivity(sensitivity_results).to_csv(
+        output_dir / "sensitivity_summary.csv", index=False
+    )
+
+    build_outcome_ml_dataset(all_children).to_csv(
+        output_dir / "ml_dataset_outcome.csv", index=False
+    )
+    build_referral_ml_dataset(all_children).to_csv(
+        output_dir / "ml_dataset_referral.csv", index=False
+    )
+
+
 def main() -> None:
+
+    args = parse_args()
 
     output_dir = Path("outputs")
     output_dir.mkdir(exist_ok=True)
@@ -141,7 +221,7 @@ def main() -> None:
     # 1. BASELINE RUN
     # =====================================================
 
-    print("\nRunning baseline simulation...")
+    print("\nRunning low-demand / original baseline...")
 
     (
         _,
@@ -151,7 +231,7 @@ def main() -> None:
         baseline_summary,
     ) = run_single(
         BASELINE_CONFIG,
-        scenario_name="Baseline",
+        scenario_name="Low-demand / original baseline",
     )
 
 
@@ -184,113 +264,8 @@ def main() -> None:
 
 
     # =====================================================
-    # 2. SCENARIO ANALYSIS
+    # 2. ORIGINAL BASELINE VISUALISATIONS
     # =====================================================
-
-    print("\nRunning scenario analysis...")
-
-    (
-        scenario_results,
-        all_children,
-        all_events,
-    ) = run_scenarios(
-        BASELINE_CONFIG,
-        replications=100,
-    )
-
-
-    scenario_results.to_csv(
-        output_dir / "scenario_replications.csv",
-        index=False,
-    )
-
-    all_children.to_csv(
-        output_dir / "children_all_scenarios.csv",
-        index=False,
-    )
-
-    all_events.to_csv(
-        output_dir / "event_log_all_scenarios.csv",
-        index=False,
-    )
-
-
-    # =====================================================
-    # 3. SCENARIO SUMMARY
-    # =====================================================
-
-    scenario_summary = summarise_scenarios(
-        scenario_results
-    )
-
-    scenario_summary.to_csv(
-        output_dir / "scenario_summary.csv",
-        index=False,
-    )
-
-
-    # =====================================================
-    # 4. ONE-WAY SENSITIVITY ANALYSIS
-    # =====================================================
-
-    print("\nRunning one-way sensitivity analysis...")
-
-    sensitivity_results = run_sensitivity_analysis(
-        BASELINE_CONFIG,
-        replications=100,
-    )
-
-    sensitivity_results.to_csv(
-        output_dir / "sensitivity_replications.csv",
-        index=False,
-    )
-
-
-    sensitivity_summary = summarise_sensitivity(
-        sensitivity_results
-    )
-
-    sensitivity_summary.to_csv(
-        output_dir / "sensitivity_summary.csv",
-        index=False,
-    )
-
-    print(
-        "\nSensitivity analysis completed."
-    )
-
-
-    # =====================================================
-    # 5. ML DATASETS
-    # =====================================================
-
-    print("\nGenerating ML datasets...")
-
-    outcome_ml_df = build_outcome_ml_dataset(
-        all_children
-    )
-
-    outcome_ml_df.to_csv(
-        output_dir / "ml_dataset_outcome.csv",
-        index=False,
-    )
-
-
-    referral_ml_df = build_referral_ml_dataset(
-        all_children
-    )
-
-    referral_ml_df.to_csv(
-        output_dir / "ml_dataset_referral.csv",
-        index=False,
-    )
-
-
-    # =====================================================
-    # 6. VISUALISATIONS
-    # =====================================================
-
-    print("\nGenerating plots...")
 
     plot_nrc_occupancy(
         baseline_resource,
@@ -302,151 +277,137 @@ def main() -> None:
         output_dir / "programme_outcomes.png",
     )
 
-    plot_scenario_delays(
-        scenario_results,
-        output_dir / "scenario_delays.png",
-    )
-
-    plot_scenario_outcomes(
-        scenario_results,
-        output_dir / "scenario_outcomes.png",
-    )
-
-    plot_nrc_scenario_performance(
-        scenario_results,
-        output_dir / "nrc_capacity_effect.png",
-    )
-
-
     # =====================================================
-    # 7. BASELINE SUMMARY
+    # 3. DEMAND LOAD CALIBRATION
     # =====================================================
-
-    print("\n" + "=" * 60)
-    print("BASELINE SIMULATION SUMMARY")
-    print("=" * 60)
-
-    for key, value in baseline_summary.items():
-
-        if isinstance(value, float):
-
-            print(
-                f"{key}: {value:.4f}"
-            )
-
-        else:
-
-            print(
-                f"{key}: {value}"
-            )
-
-
-    # =====================================================
-    # 8. SCENARIO SUMMARY
-    # =====================================================
-
-    print("\n" + "=" * 60)
-    print("SCENARIO MEANS")
-    print("=" * 60)
-
-    display_columns = [
-
-        "scenario",
-
-        "mean_queue_wait_days_mean",
-
-        "mean_operational_delay_days_mean",
-
-        "recovery_rate_mean",
-
-        "dropout_rate_mean",
-
-        "non_responder_rate_mean",
-
-        "nrc_utilisation_mean",
-    ]
-
-    available_display_columns = [
-
-        column
-        for column in display_columns
-
-        if column
-        in scenario_summary.columns
-    ]
-
 
     print(
-        scenario_summary[
-            available_display_columns
-        ].to_string(index=False)
+        "\nRunning demand load calibration "
+        f"({args.search_replications} replications per load)..."
+    )
+    calibration_results = run_load_calibration(
+        BASELINE_CONFIG,
+        replications=args.search_replications,
+    )
+    calibration_summary = summarise_load_calibration(calibration_results)
+    calibration_results.to_csv(
+        output_dir / "load_calibration_replications.csv",
+        index=False,
+        float_format="%.6f",
+    )
+    calibration_summary.to_csv(
+        output_dir / "load_calibration_summary.csv",
+        index=False,
+        float_format="%.6f",
+    )
+    plot_load_vs_nrc_utilisation(
+        calibration_summary,
+        output_dir / "load_vs_nrc_utilisation.png",
+        *CALIBRATION_BAND,
+    )
+    plot_load_vs_queue_wait(
+        calibration_summary,
+        output_dir / "load_vs_queue_wait.png",
     )
 
+    calibrated_load = select_calibrated_load(
+        calibration_summary,
+        CALIBRATION_BAND,
+    )
+    original_row = calibration_summary.loc[
+        calibration_summary["number_of_children"]
+        == BASELINE_CONFIG.number_of_children
+    ].iloc[0]
 
-    # =====================================================
-    # 9. SENSITIVITY SUMMARY
-    # =====================================================
-
-    print("\n" + "=" * 60)
-    print("SENSITIVITY ANALYSIS")
-    print("=" * 60)
-
-    print(
-        sensitivity_summary.to_string(
-            index=False
+    if calibrated_load is None:
+        print("\n" + "=" * 60)
+        print("DEMAND LOAD CALIBRATION SUMMARY")
+        print("=" * 60)
+        print(f"Original baseline load: {BASELINE_CONFIG.number_of_children}")
+        print(
+            "Original baseline mean NRC utilisation: "
+            f"{original_row['mean_nrc_utilisation']:.1%}"
         )
+        print("Calibrated load selected: none")
+        print("70–90% target band reached: No")
+        print("Capacity analysis was not run because no tested load met the rule.")
+        return
+
+    # =====================================================
+    # 4. CAPACITY ANALYSIS AT THE CALIBRATED WORKLOAD
+    # =====================================================
+
+    print(
+        "\nRunning calibrated capacity analysis "
+        f"({args.final_replications} replications per capacity)..."
+    )
+    capacity_results = run_calibrated_capacity_analysis(
+        BASELINE_CONFIG,
+        calibrated_load,
+        replications=args.final_replications,
+    )
+    capacity_summary = summarise_calibrated_capacity(capacity_results)
+    capacity_results.to_csv(
+        output_dir / "calibrated_capacity_replications.csv",
+        index=False,
+        float_format="%.6f",
+    )
+    capacity_summary.to_csv(
+        output_dir / "calibrated_capacity_summary.csv",
+        index=False,
+        float_format="%.6f",
+    )
+    plot_calibrated_capacity_effect(
+        capacity_summary,
+        output_dir / "calibrated_capacity_effect.png",
+    )
+    plot_calibrated_capacity_utilisation(
+        capacity_summary,
+        output_dir / "calibrated_capacity_utilisation.png",
     )
 
+    if args.include_existing_analyses:
+        run_existing_analyses(output_dir)
 
-    # =====================================================
-    # 10. DATASET INFORMATION
-    # =====================================================
+    calibrated_row = capacity_summary.loc[
+        capacity_summary["nrc_capacity"] == BASELINE_CONFIG.nrc_beds
+    ].iloc[0]
+    search_row = calibration_summary.loc[
+        calibration_summary["number_of_children"] == calibrated_load
+    ].iloc[0]
 
     print("\n" + "=" * 60)
-    print("GENERATED DATASETS")
+    print("DEMAND LOAD CALIBRATION SUMMARY")
     print("=" * 60)
-
-
+    print(f"Original baseline load: {BASELINE_CONFIG.number_of_children}")
     print(
-        f"Baseline children: "
-        f"{len(baseline_children)}"
+        "Original baseline mean NRC utilisation: "
+        f"{original_row['mean_nrc_utilisation']:.1%}"
     )
-
-
+    print(f"Calibrated load selected: {calibrated_load}")
     print(
-        f"Scenario child records: "
-        f"{len(all_children)}"
+        "Calibrated mean NRC utilisation (12 beds): "
+        f"{calibrated_row['mean_nrc_utilisation']:.1%}"
     )
-
-
     print(
-        f"Event records: "
-        f"{len(all_events)}"
+        "Calibrated mean NRC queue wait (12 beds): "
+        f"{calibrated_row['mean_queue_wait_days']:.3f} days"
     )
-
-
     print(
-        f"ML outcome dataset rows: "
-        f"{len(outcome_ml_df)}"
+        "Calibrated mean peak queue (12 beds): "
+        f"{calibrated_row['mean_peak_queue_length']:.2f} children"
     )
-
-
+    print("70–90% target band reached: Yes")
     print(
-        f"ML referral dataset rows: "
-        f"{len(referral_ml_df)}"
+        "Selection-stage utilisation: "
+        f"{search_row['mean_nrc_utilisation']:.1%}"
     )
-
-
     print(
-        f"Sensitivity replications: "
-        f"{len(sensitivity_results)}"
+        "\nInterpretation: the calibration matches simulated facility workload "
+        "to a literature-informed occupancy range; it does not imply that the "
+        "selected number of detected children is a national epidemiological estimate."
     )
-
-
-    print(
-        "\nOutputs saved in:",
-        output_dir.resolve(),
-    )
+    print("\nOutputs saved in:", output_dir.resolve())
 
 
 # =========================================================
