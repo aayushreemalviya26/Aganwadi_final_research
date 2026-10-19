@@ -1,0 +1,6 @@
+outcome,replications,mean_percentage,sd_percentage,ci_95_lower_percentage,ci_95_upper_percentage
+Recovered,100,47.001463,0.546283,46.894392,47.108534
+Dropout,100,17.936270,0.387516,17.860317,18.012223
+Non-responder,100,35.062264,0.544727,34.955497,35.169031
+Active MAM at horizon,100,0.000000,0.000000,0.000000,0.000000
+Active SAM at horizon,100,0.000000,0.000000,0.000000,0.000000

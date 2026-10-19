@@ -39,6 +39,6 @@
   "peak_nrc_occupancy": 4,
   "peak_queue_length": 0,
   "nrc_utilisation": 0.08440366972477065,
-  "scenario": "Baseline",
+  "scenario": "Low-demand / original baseline",
   "random_seed": 42
 }

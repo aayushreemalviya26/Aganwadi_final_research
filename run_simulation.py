@@ -12,6 +12,7 @@ from calibration import (
     run_load_calibration,
     select_calibrated_load,
     summarise_calibrated_capacity,
+    summarise_calibrated_outcomes,
     summarise_load_calibration,
 )
 
@@ -29,6 +30,7 @@ from sensitivity import (
 from visualization import (
     plot_calibrated_capacity_effect,
     plot_calibrated_capacity_utilisation,
+    plot_calibrated_programme_outcomes,
     plot_load_vs_nrc_utilisation,
     plot_load_vs_queue_wait,
     plot_nrc_occupancy,
@@ -325,11 +327,15 @@ def main() -> None:
         print("=" * 60)
         print(f"Original baseline load: {BASELINE_CONFIG.number_of_children}")
         print(
-            "Original baseline mean NRC utilisation: "
-            f"{original_row['mean_nrc_utilisation']:.1%}"
+            "Original baseline active-window NRC utilisation: "
+            f"{original_row['mean_active_window_nrc_utilisation']:.1%}"
+        )
+        print(
+            "Original baseline full-horizon NRC utilisation: "
+            f"{original_row['mean_full_horizon_nrc_utilisation']:.1%}"
         )
         print("Calibrated load selected: none")
-        print("70–90% target band reached: No")
+        print("70-90% target band reached: No")
         print("Capacity analysis was not run because no tested load met the rule.")
         return
 
@@ -357,6 +363,15 @@ def main() -> None:
         index=False,
         float_format="%.6f",
     )
+    outcome_summary = summarise_calibrated_outcomes(
+        capacity_results,
+        nrc_capacity=BASELINE_CONFIG.nrc_beds,
+    )
+    outcome_summary.to_csv(
+        output_dir / "calibrated_programme_outcomes_summary.csv",
+        index=False,
+        float_format="%.6f",
+    )
     plot_calibrated_capacity_effect(
         capacity_summary,
         output_dir / "calibrated_capacity_effect.png",
@@ -364,6 +379,11 @@ def main() -> None:
     plot_calibrated_capacity_utilisation(
         capacity_summary,
         output_dir / "calibrated_capacity_utilisation.png",
+    )
+    plot_calibrated_programme_outcomes(
+        outcome_summary,
+        output_dir / "calibrated_programme_outcomes.png",
+        calibrated_load,
     )
 
     if args.include_existing_analyses:
@@ -381,26 +401,54 @@ def main() -> None:
     print("=" * 60)
     print(f"Original baseline load: {BASELINE_CONFIG.number_of_children}")
     print(
-        "Original baseline mean NRC utilisation: "
-        f"{original_row['mean_nrc_utilisation']:.1%}"
+        "Original baseline active-window NRC utilisation: "
+        f"{original_row['mean_active_window_nrc_utilisation']:.1%}"
+    )
+    print(
+        "Original baseline full-horizon NRC utilisation: "
+        f"{original_row['mean_full_horizon_nrc_utilisation']:.1%}"
     )
     print(f"Calibrated load selected: {calibrated_load}")
     print(
-        "Calibrated mean NRC utilisation (12 beds): "
-        f"{calibrated_row['mean_nrc_utilisation']:.1%}"
+        "Calibrated active-window NRC utilisation (12 beds): "
+        f"{calibrated_row['mean_active_window_nrc_utilisation']:.1%}"
+    )
+    print(
+        "Calibrated full-horizon NRC utilisation (12 beds): "
+        f"{calibrated_row['mean_full_horizon_nrc_utilisation']:.1%}"
     )
     print(
         "Calibrated mean NRC queue wait (12 beds): "
         f"{calibrated_row['mean_queue_wait_days']:.3f} days"
     )
     print(
+        "Calibrated median NRC queue wait (12 beds): "
+        f"{calibrated_row['median_queue_wait_days']:.3f} days"
+    )
+    print(
+        "Calibrated 95th-percentile NRC queue wait (12 beds): "
+        f"{calibrated_row['p95_queue_wait_days']:.3f} days"
+    )
+    print(
         "Calibrated mean peak queue (12 beds): "
         f"{calibrated_row['mean_peak_queue_length']:.2f} children"
     )
-    print("70–90% target band reached: Yes")
     print(
-        "Selection-stage utilisation: "
-        f"{search_row['mean_nrc_utilisation']:.1%}"
+        "Proportion of NRC arrivals waiting >0 days (12 beds): "
+        f"{calibrated_row['proportion_nrc_arrivals_waited_gt_0']:.1%}"
+    )
+    print("70-90% target band reached: Yes")
+    print(
+        "Selection-stage active-window utilisation: "
+        f"{search_row['mean_active_window_nrc_utilisation']:.1%}"
+    )
+    print(
+        "Internal plausibility sanity check: "
+        + (
+            "FLAGGED - " + calibrated_row["sanity_check_reasons"]
+            if calibrated_row["sanity_check_flag"]
+            else "No automatic warning flags"
+        )
     )
     print(
         "\nInterpretation: the calibration matches simulated facility workload "
